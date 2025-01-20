@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
@@ -58,7 +59,8 @@ internal class RequestHelper
     public Task<HttpResponseMessage> GetAsync(
         string url,
         string? parameters = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BrowserType browser = BrowserType.Chrome)
     {
         // Create HTTP request
         HttpRequestMessage request = new()
@@ -66,6 +68,8 @@ internal class RequestHelper
             Method = HttpMethod.Get,
             RequestUri = new UriBuilder(url) { Query = parameters }.Uri
         };
+
+        AddUserAgent(request, browser);
 
         // Send HTTP request
         logger?.LogInformation($"[RequestHelper-GetAsync] Sending HTTP reuqest. GET: {url}.");
@@ -85,7 +89,8 @@ internal class RequestHelper
     public async Task<string> GetAndValidateAsync(
         string uri,
         string? parameters = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BrowserType browser = BrowserType.Chrome)
     {
         // Send HTTP request
         HttpResponseMessage httpResponse = await GetAsync(uri, parameters, cancellationToken).ConfigureAwait(false);
@@ -122,7 +127,8 @@ internal class RequestHelper
         string url,
         object? body = null,
         string? parameters = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BrowserType browser = BrowserType.Chrome)
     {
         // Create HTTP request
         HttpRequestMessage request = new()
@@ -130,8 +136,11 @@ internal class RequestHelper
             Method = HttpMethod.Post,
             RequestUri = new UriBuilder(url) { Query = parameters }.Uri,
         };
+
         if (body is not null)
             request.Content = new StringContent(JsonConvert.SerializeObject(body, new JsonSerializerSettings() { NullValueHandling = NullValueHandling.Ignore }), Encoding.UTF8, "application/json");
+
+        AddUserAgent(request, browser);
 
         // Send HTTP request
         logger?.LogInformation($"[RequestHelper-PostBodyAsync] Sending HTTP reuqest. POST: {url}.");
@@ -154,7 +163,8 @@ internal class RequestHelper
         string uri,
         object? body = null,
         string? parameters = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BrowserType browser = BrowserType.Chrome)
     {
         // Send HTTP request
         HttpResponseMessage httpResponse = await PostAsync(uri, body, parameters, cancellationToken).ConfigureAwait(false);
@@ -172,5 +182,27 @@ internal class RequestHelper
 
         // Return response data
         return httpResponseData;
+    }
+
+
+    private static void AddUserAgent(HttpRequestMessage message, BrowserType browser)
+    {
+        switch(browser)
+        {
+            case BrowserType.IOS:
+                {
+                    message.Headers.Add("User-Agent", "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)");
+                }break;
+            case BrowserType.Chrome:
+                {
+                    message.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36");
+                }break;
+        }
+    }
+
+    public enum BrowserType
+    {
+        IOS,
+        Chrome,
     }
 }

@@ -24,8 +24,6 @@ internal class CookiesHttpHandler : DelegatingHandler
         if (cookies is not null)
             foreach (var cookie in cookies)
                 cookieContainer.Add(cookie);
-
-        cookieContainer.Add(new Cookie("SOCS", "CAISEwgDEgk2NzM5OTg2ODUaAmVuIAEaBgiA6p23Bg") { Domain = ".youtube.com" });
     }
 
 
@@ -72,7 +70,10 @@ internal class CookiesHttpHandler : DelegatingHandler
         string requestUrl = request.RequestUri.OriginalString;
         request.RequestUri = new(requestUrl + (requestUrl.Contains('?') ? '&' : '?') + "key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w");
 
-        request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
+
+        if (request.Headers.Contains("User-Agent") == false)
+            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
+
         request.Headers.Add("Origin", request.RequestUri.Scheme + Uri.SchemeDelimiter + request.RequestUri.Host);
 
         if (TryGenerateAuthHeaderValue(request.RequestUri) is string authHeaderValue)

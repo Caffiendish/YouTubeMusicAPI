@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Newtonsoft.Json.Linq;
+using YouTubeMusicAPI.Models;
 using YouTubeMusicAPI.Models.Info;
 using YouTubeMusicAPI.Types;
 
@@ -21,8 +22,8 @@ internal static class InfoParser
         JObject playerJsonToken,
         JObject nextJsonToken)
     {
-        JToken nextTabContainer = nextJsonToken.SelectRequieredToken("contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs");
-        JToken nextItem = nextTabContainer.SelectRequieredToken("[0].tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer.contents[0].playlistPanelVideoRenderer");
+        JToken nextTabContainer = nextJsonToken.SelectRequiredToken("contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs");
+        JToken nextItem = nextTabContainer.FindTokens("playlistPanelVideoRenderer").First();// SelectRequiredToken("[0].tabRenderer.content.musicQueueRenderer.content.playlistPanelRenderer.contents[0].playlistPanelVideoRenderer");
 
         int albumIndex = nextItem.SelectObject<JToken[]>("longBylineText.runs").Length - 3;
         string? albumId = albumIndex > -1 ? nextItem.SelectObjectOptional<string>($"longBylineText.runs[{albumIndex}].navigationEndpoint.browseEndpoint.browseId") : null;
@@ -61,11 +62,11 @@ internal static class InfoParser
     public static AlbumInfo GetAlbum(
         JObject jsonToken)
     {
-        JToken innerJsonToken = jsonToken.SelectRequieredToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicResponsiveHeaderRenderer");
+        JToken innerJsonToken = jsonToken.SelectRequiredToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicResponsiveHeaderRenderer");
 
         return new(
             name: innerJsonToken.SelectObject<string>("title.runs[0].text"),
-            id: innerJsonToken.SelectObject<string>("buttons[1].musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.playlistId"),
+            innerJsonToken.FindTokens("musicPlayButtonRenderer").First().SelectObject<string>(".playNavigationEndpoint.watchEndpoint.playlistId"),
             description: innerJsonToken.SelectObjectOptional<JToken[]>("description.musicDescriptionShelfRenderer.description.runs")?.Aggregate("", (desc, run) => desc + run.SelectObjectOptional<string>("text")),
             artists: innerJsonToken.SelectArtists("straplineTextOne.runs"),
             duration: innerJsonToken.SelectObject<string>("secondSubtitle.runs[2].text").ToTimeSpanLong(),
@@ -86,14 +87,38 @@ internal static class InfoParser
     public static CommunityPlaylistInfo GetCommunityPlaylist(
         JObject jsonToken)
     {
-        JToken? innerJsonToken = jsonToken.SelectToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicResponsiveHeaderRenderer") ?? jsonToken.SelectRequieredToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer");
+        JToken? innerJsonToken = jsonToken.SelectToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicResponsiveHeaderRenderer") ?? jsonToken.SelectRequiredToken("contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicEditablePlaylistDetailHeaderRenderer.header.musicResponsiveHeaderRenderer");
 
         JToken[] runs = innerJsonToken.SelectObject<JToken[]>("subtitle.runs");
         JToken[] secondRuns = innerJsonToken.SelectObject<JToken[]>("secondSubtitle.runs");
+#if DEBUG
+        string name = innerJsonToken.SelectObject<string>("title.runs[0].text");
+        string id = innerJsonToken.FindTokens("musicPlayButtonRenderer").First().SelectObject<string>(".playNavigationEndpoint.watchEndpoint.playlistId");
+        string description = innerJsonToken.SelectObjectOptional<JToken[]>("description.musicDescriptionShelfRenderer.description.runs")?.Aggregate("", (desc, run) => desc + run.SelectObjectOptional<string>("text"));
+        YouTubeMusicItem creator = innerJsonToken.SelectYouTubeMusicItem("facepile.avatarStackViewModel.text.content", "facepile.avatarStackViewModel.rendererContext.commandContext.onTap.innertubeCommand.browseEndpoint.browseId", YouTubeMusicItemKind.Profiles);
+        string viewInfo = secondRuns.Length - 5 < 0 ? null : innerJsonToken.SelectObjectOptional<string>("secondSubtitle.runs[0].text");
+        TimeSpan duration = innerJsonToken.SelectObject<string>($"secondSubtitle.runs[{secondRuns.Length - 1}].text").ToTimeSpanLong();
+        int songCount = int.Parse(innerJsonToken.SelectObject<string>($"secondSubtitle.runs[{secondRuns.Length - 3}].text").Split(' ')[0], NumberStyles.AllowThousands, CultureInfo.InvariantCulture);
+        int creationYear = innerJsonToken.SelectObject<int>($"subtitle.runs[{runs.Length - 1}].text");
+        var thumbnails = innerJsonToken.SelectThumbnails();
+        var songs = jsonToken.SelectCommunityPlaylistSongs("contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents[0].musicPlaylistShelfRenderer.contents");
+
+        return new(
+            name: name,
+            id: id,
+            description: description,
+            creator: creator,
+            viewsInfo: viewInfo,
+            duration: duration,
+            songCount: songCount,
+            creationYear: creationYear,
+            thumbnails: thumbnails,
+            songs: songs);
+#else
 
         return new(
             name: innerJsonToken.SelectObject<string>("title.runs[0].text"),
-            id: innerJsonToken.SelectObject<string>("buttons[1].musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.playlistId"),
+            id: innerJsonToken.FindTokens("musicPlayButtonRenderer").First().SelectObject<string>(".playNavigationEndpoint.watchEndpoint.playlistId"),
             description: innerJsonToken.SelectObjectOptional<JToken[]>("description.musicDescriptionShelfRenderer.description.runs")?.Aggregate("", (desc, run) => desc + run.SelectObjectOptional<string>("text")),
             creator: innerJsonToken.SelectYouTubeMusicItem("facepile.avatarStackViewModel.text.content", "facepile.avatarStackViewModel.rendererContext.commandContext.onTap.innertubeCommand.browseEndpoint.browseId", YouTubeMusicItemKind.Profiles),
             viewsInfo: secondRuns.Length - 5 < 0 ? null : innerJsonToken.SelectObjectOptional<string>("secondSubtitle.runs[0].text"),
@@ -102,6 +127,7 @@ internal static class InfoParser
             creationYear: innerJsonToken.SelectObject<int>($"subtitle.runs[{runs.Length - 1}].text"),
             thumbnails: innerJsonToken.SelectThumbnails(),
             songs: jsonToken.SelectCommunityPlaylistSongs("contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer.contents[0].musicPlaylistShelfRenderer.contents"));
+#endif
     }
     /// <summary>
     /// Parses simple community playlist info data from the json token
@@ -112,7 +138,7 @@ internal static class InfoParser
     public static CommunityPlaylistInfo GetCommunityPlaylistSimple(
         JObject jsonToken)
     {
-        JToken innerJsonToken = jsonToken.SelectRequieredToken("contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs[0].tabRenderer.content.musicQueueRenderer");
+        JToken innerJsonToken = jsonToken.SelectRequiredToken("contents.singleColumnMusicWatchNextResultsRenderer.tabbedRenderer.watchNextTabbedResultsRenderer.tabs[0].tabRenderer.content.musicQueueRenderer");
 
         CommunityPlaylistSongInfo[] songs = innerJsonToken.SelectCommunityPlaylistSimpleSongs("content.playlistPanelRenderer.contents");
 
@@ -140,7 +166,7 @@ internal static class InfoParser
     {
         JToken? innerJsonToken = jsonToken.SelectToken("header.musicImmersiveHeaderRenderer");
         bool isRich = innerJsonToken is not null;
-        innerJsonToken ??= jsonToken.SelectRequieredToken("header.musicVisualHeaderRenderer");
+        innerJsonToken ??= jsonToken.SelectRequiredToken("header.musicVisualHeaderRenderer");
 
         JToken[] contents = jsonToken.SelectObject<JToken[]>("contents.singleColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents");
 

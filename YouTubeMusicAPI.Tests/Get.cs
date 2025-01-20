@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using System.Net;
 using YouTubeMusicAPI.Client;
 using YouTubeMusicAPI.Models.Info;
 
@@ -12,6 +13,7 @@ internal class Get
 {
     ILogger logger;
     YouTubeMusicClient client;
+    bool usingCookies = true;
 
     [SetUp]
     public void Setup()
@@ -22,7 +24,22 @@ internal class Get
         });
 
         logger = factory.CreateLogger<Search>();
-        client = new(logger, TestData.GeographicalLocation);
+
+        if (usingCookies)
+        {
+            IEnumerable<Cookie> parsedCookies = TestData.CookiesString
+                .Split(";")
+                .Select(cookieString =>
+                {
+                    string[] parts = cookieString.Split("\t");
+                    return new Cookie(parts[0], parts[1]) { Domain = ".youtube.com" };
+                });
+            client = new(logger, TestData.GeographicalLocation, parsedCookies);
+        }
+        else
+        {
+            client = new(logger, TestData.GeographicalLocation);
+        }
     }
 
 

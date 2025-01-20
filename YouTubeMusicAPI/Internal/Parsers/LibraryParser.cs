@@ -20,6 +20,10 @@ internal class LibraryParser
     public static LibraryCommunityPlaylist GetCommunityPlaylist(
         JObject jsonToken)
     {
+        var browseId = jsonToken.SelectToken("musicTwoRowItemRenderer.title.runs[0].navigationEndpoint.browseEndpoint.browseId");
+        if (browseId?.Value<string>() == "VLLM")
+            return default;
+        
         JToken[] runs = jsonToken.SelectObject<JToken[]>("musicTwoRowItemRenderer.subtitle.runs");
 
         string? createdId = jsonToken.SelectObjectOptional<string>("musicTwoRowItemRenderer.subtitle.runs[0].navigationEndpoint.browseEndpoint.browseId");
@@ -27,8 +31,8 @@ internal class LibraryParser
         return new(
             name: jsonToken.SelectObject<string>("musicTwoRowItemRenderer.title.runs[0].text"),
             id: jsonToken.SelectObject<string>("musicTwoRowItemRenderer.thumbnailOverlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchPlaylistEndpoint.playlistId"),
-            creator: new(createdId is null ? "YouTube Music" : jsonToken.SelectObject<string>("musicTwoRowItemRenderer.subtitle.runs[0].text"), createdId, YouTubeMusicItemKind.Profiles),
-            songCount: int.Parse(jsonToken.SelectObject<string>($"musicTwoRowItemRenderer.subtitle.runs[{runs.Length - 1}].text").Split(' ')[0], NumberStyles.AllowThousands, CultureInfo.InvariantCulture),
+            creator: new(createdId is null ? "YouTube Music" : runs.First().SelectObject<string>("text"), createdId, YouTubeMusicItemKind.Profiles),
+            songCount: int.Parse(runs.Last().SelectObject<string>($"text").Split(' ')[0], NumberStyles.AllowThousands, CultureInfo.InvariantCulture),
             radio: jsonToken.SelectRadio("musicTwoRowItemRenderer.menu.menuRenderer.items[1].menuNavigationItemRenderer.navigationEndpoint.watchPlaylistEndpoint.playlistId", null),
             thumbnails: jsonToken.SelectThumbnails("musicTwoRowItemRenderer.thumbnailRenderer.musicThumbnailRenderer.thumbnail.thumbnails"));
     }
@@ -42,15 +46,62 @@ internal class LibraryParser
     public static LibrarySong GetSong(
         JObject jsonToken)
     {
+
+#if DEBUG
+
+        var name = jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+        var id = jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId");
+        var artists = jsonToken.SelectArtists("musicResponsiveListItemRenderer.flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs");
+        var album = jsonToken.SelectYouTubeMusicItem("musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text", "musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Albums);
+
+        var fixedColumn = jsonToken.SelectToken("musicResponsiveListItemRenderer.fixedColumns[0]");
+        TimeSpan duration;
+        if (fixedColumn != null)
+        {
+            duration = fixedColumn.SelectObject<string>("musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan();
+        }
+        else
+        {
+            duration = jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[3].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text").ToTimeSpan();
+        }
+
+        var isExplicit = jsonToken.SelectIsExplicit("musicResponsiveListItemRenderer.badges");
+        var radio = jsonToken.SelectRadio("musicResponsiveListItemRenderer.menu.menuRenderer.items[0].menuNavigationItemRenderer.navigationEndpoint.watchEndpoint.playlistId", "musicResponsiveListItemRenderer.menu.menuRenderer.items[0].menuNavigationItemRenderer.navigationEndpoint.watchEndpoint.videoId");
+        var thumbnails = jsonToken.SelectThumbnails("musicResponsiveListItemRenderer.thumbnail.musicThumbnailRenderer.thumbnail.thumbnails");
+
+        return new(
+            name: name,
+            id: id,
+            artists: artists,
+            album: album,
+            duration: duration,
+            isExplicit: isExplicit,
+            radio: radio,
+            thumbnails: thumbnails);
+#else
+
+        var fixedColumn = jsonToken.SelectToken("musicResponsiveListItemRenderer.fixedColumns[0]");
+        TimeSpan duration;
+        if (fixedColumn != null)
+        {
+            duration = fixedColumn.SelectObject<string>("musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan();
+        }
+        else
+        {
+            duration = jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[3].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text").ToTimeSpan();
+        }
+
         return new(
             name: jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
             id: jsonToken.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId"),
             artists: jsonToken.SelectArtists("musicResponsiveListItemRenderer.flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs"),
             album: jsonToken.SelectYouTubeMusicItem("musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text", "musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Albums),
-            duration: jsonToken.SelectObject<string>($"musicResponsiveListItemRenderer.fixedColumns[0].musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan(),
+            duration: duration,
             isExplicit: jsonToken.SelectIsExplicit("musicResponsiveListItemRenderer.badges"),
             radio: jsonToken.SelectRadio("musicResponsiveListItemRenderer.menu.menuRenderer.items[0].menuNavigationItemRenderer.navigationEndpoint.watchEndpoint.playlistId", "musicResponsiveListItemRenderer.menu.menuRenderer.items[0].menuNavigationItemRenderer.navigationEndpoint.watchEndpoint.videoId"),
             thumbnails: jsonToken.SelectThumbnails("musicResponsiveListItemRenderer.thumbnail.musicThumbnailRenderer.thumbnail.thumbnails"));
+
+#endif
     }
 
     /// <summary>

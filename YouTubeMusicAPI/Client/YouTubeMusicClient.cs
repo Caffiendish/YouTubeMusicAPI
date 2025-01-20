@@ -294,7 +294,7 @@ public class YouTubeMusicClient
         string requestResponse = await baseClient.GetWebContentAsync(Endpoints.Playlist, parameters, cancellationToken);
 
         // Parse request response
-        Match match = Regex.Match(Regex.Unescape(requestResponse), "\"MPRE.+?\"");
+        Match match = Regex.Match(Regex.Unescape(requestResponse), "\"MPRE.+?\"");//MPREb_6NKg8kkJLf7
         if (!match.Success)
         {
             logger?.LogError($"[YouTubeMusicClient-GetAlbumBrowseIdAsync] Getting album browse id failed. Found no match.");

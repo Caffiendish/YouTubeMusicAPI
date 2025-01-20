@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using System;
 using YouTubeMusicAPI.Models;
 using YouTubeMusicAPI.Models.Info;
 using YouTubeMusicAPI.Models.Streaming;
@@ -11,19 +12,48 @@ namespace YouTubeMusicAPI.Internal;
 /// </summary>
 internal static class Selectors
 {
+
+    public static List<JToken> FindTokens(this JToken containerToken, string name)
+    {
+        List<JToken> matches = new List<JToken>();
+        FindTokens(containerToken, name, matches);
+        return matches;
+    }
+
+    private static void FindTokens(JToken containerToken, string name, List<JToken> matches)
+    {
+        if (containerToken.Type == JTokenType.Object)
+        {
+            foreach (JProperty child in containerToken.Children<JProperty>())
+            {
+                if (child.Name == name)
+                {
+                    matches.Add(child.Value);
+                }
+                FindTokens(child.Value, name, matches);
+            }
+        }
+        else if (containerToken.Type == JTokenType.Array)
+        {
+            foreach (JToken child in containerToken.Children())
+            {
+                FindTokens(child, name, matches);
+            }
+        }
+    }
     /// <summary>
-    /// Selects a requiered token from a json token
+    /// Selects a Required token from a json token
     /// </summary>
     /// <param name="value">The json token containing the token</param>
     /// <param name="path">The json token path</param>
     /// <returns>A JToken</returns>
     /// <exception cref="ArgumentNullException">Occurrs when the specified path could not be found</exception>
-    public static JToken SelectRequieredToken(
+    public static JToken SelectRequiredToken(
         this JToken value,
         string path)
     {
         JToken? result = value.SelectToken(path);
-        return result is null ? throw new ArgumentNullException(path, "Requiered token is null.") : result;
+        return result is null ? throw new ArgumentNullException(path, "Required token is null.") : result;
     }
 
 
@@ -40,7 +70,7 @@ internal static class Selectors
         string path)
     {
         object? result = value.SelectToken(path)?.ToObject(typeof(T));
-        return result is null ? throw new ArgumentNullException(path, "Requiered token is null.") : (T)result;
+        return result is null ? throw new ArgumentNullException(path, "Required token is null.") : (T)result;
     }
 
     /// <summary>
@@ -264,14 +294,48 @@ internal static class Selectors
         string path)
     {
         List<AlbumSongInfo> result = [];
-        foreach (JToken content in value.SelectObject<JToken[]>(path))
+        var tokens = value.FindTokens("musicShelfRenderer").First().FindTokens("contents");
+
+
+        foreach (JToken content in tokens.Children())
+        {
+#if DEBUG
+            string name = content.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+            string id = content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId");
+            bool explicitAge = content.SelectObjectOptional<JToken[]>("musicResponsiveListItemRenderer.badges")?.Any(badge => badge.SelectToken("musicInlineBadgeRenderer.icon.iconType")?.ToString() == "MUSIC_EXPLICIT_BADGE") ?? false;
+            string playInfo = content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+
+            
+            var text = content.SelectToken("musicResponsiveListItemRenderer.flexColumns[3].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+            if (text == null)
+                text = content.SelectToken("musicResponsiveListItemRenderer.fixedColumns[0].musicResponsiveListItemFixedColumnRenderer.text.runs[0].text");
+            TimeSpan duration = text.Value<string>().ToTimeSpan();
+            int songNum = content.SelectObjectOptional<int>("musicResponsiveListItemRenderer.index.runs[0].text");
+
+            result.Add(new(
+                name: name,
+                id: id,
+                isExplicit: explicitAge,
+                playsInfo: playInfo,
+                duration: duration,
+                songNumber: songNum));
+
+#else
+
+            var text = content.SelectToken("musicResponsiveListItemRenderer.flexColumns[3].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+            if (text == null)
+                text = content.SelectToken("musicResponsiveListItemRenderer.fixedColumns[0].musicResponsiveListItemFixedColumnRenderer.text.runs[0].text");
+            TimeSpan duration = text.Value<string>().ToTimeSpan();
+
             result.Add(new(
                 name: content.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
                 id: content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId"),
                 isExplicit: content.SelectObjectOptional<JToken[]>("musicResponsiveListItemRenderer.badges")?.Any(badge => badge.SelectToken("musicInlineBadgeRenderer.icon.iconType")?.ToString() == "MUSIC_EXPLICIT_BADGE") ?? false,
                 playsInfo: content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
-                duration: content.SelectObject<string>("musicResponsiveListItemRenderer.fixedColumns[0].musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan(),
+                duration: duration,
                 songNumber: content.SelectObjectOptional<int>("musicResponsiveListItemRenderer.index.runs[0].text")));
+#endif
+        }
 
         return [.. result];
     }
@@ -292,6 +356,37 @@ internal static class Selectors
         {
             int albumIndex = content.SelectObject<JToken[]>("musicResponsiveListItemRenderer.flexColumns").Length - 1;
 
+#if DEBUG
+
+            var name = content.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+            var id = content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId");
+            var artists = content.SelectArtists("musicResponsiveListItemRenderer.flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs");
+            var album = content.SelectSehlfItemOptional($"musicResponsiveListItemRenderer.flexColumns[{albumIndex}].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text", $"musicResponsiveListItemRenderer.flexColumns[{albumIndex}].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Albums);
+            var isExplict = content.SelectIsExplicit("musicResponsiveListItemRenderer.badges");
+
+            var fixedColumn = content.SelectToken("musicResponsiveListItemRenderer.fixedColumns[0]");
+            TimeSpan duration;
+            if (fixedColumn != null)
+            {
+                duration = fixedColumn.SelectObject<string>("musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan();
+            }
+            else
+            {
+                duration = content.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text").ToTimeSpan();
+            }
+             
+
+            var thumbnails = content.SelectThumbnails("musicResponsiveListItemRenderer.thumbnail.musicThumbnailRenderer.thumbnail.thumbnails");
+
+            result.Add(new(
+                name: name,
+                id: id,
+                artists: artists,
+                album: album,
+                isExplicit: isExplict,
+                duration: duration,
+                thumbnails: thumbnails));
+#else
             result.Add(new(
                 name: content.SelectObject<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
                 id: content.SelectObjectOptional<string>("musicResponsiveListItemRenderer.flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId"),
@@ -300,8 +395,9 @@ internal static class Selectors
                 isExplicit: content.SelectIsExplicit("musicResponsiveListItemRenderer.badges"),
                 duration: content.SelectObject<string>("musicResponsiveListItemRenderer.fixedColumns[0].musicResponsiveListItemFixedColumnRenderer.text.runs[0].text").ToTimeSpan(),
                 thumbnails: content.SelectThumbnails("musicResponsiveListItemRenderer.thumbnail.musicThumbnailRenderer.thumbnail.thumbnails")));
+      
+#endif
         }
-
         return [.. result];
     }
     /// <summary>
@@ -467,15 +563,14 @@ internal static class Selectors
     /// <param name="path">The json token path</param>
     /// <returns>An array of media stream info</returns>
     public static MediaStreamInfo[] SelectStreamInfo(
-        this JToken value,
-        string path = "streamingData.adaptiveFormats")
+        this JToken value)
     {
-        JToken[]? adaptiveFormats = value.SelectObjectOptional<JToken[]>(path);
+        var adaptiveFormats = value.FindTokens("streamingData").First().FindTokens("adaptiveFormats");
         if (adaptiveFormats is null)
             return [];
 
         List<MediaStreamInfo> result = [];
-        foreach (JToken content in adaptiveFormats)
+        foreach (JToken content in adaptiveFormats.Children())
         {
             string mimeType = content.SelectObject<string>("mimeType");
             string format = mimeType.Split('/')[1].Split(';')[0];

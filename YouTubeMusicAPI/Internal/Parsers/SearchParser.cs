@@ -23,9 +23,30 @@ internal static class SearchParser
         int albumIndex = artists[0].Id is null ? 2 : artists.Length * 2;
         int durationIndex = artists[0].Id is null ? 4 : artists.Length * 2 + 2;
 
+#if DEBUG
+        var name = jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+        var id = jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId");
+        var album = jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{albumIndex}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{albumIndex}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Albums);
+        var duration = jsonToken.SelectObject<string>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{durationIndex}].text").ToTimeSpan();
+        var isExplicit = jsonToken.SelectIsExplicit("badges");
+        var playsInfo = jsonToken.SelectObject<string>("flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+        var radio = jsonToken.SelectRadio();
+        var thumbnails = jsonToken.SelectThumbnails();
+
+        return new(
+            name: name,
+            id: id,
+            artists: artists,
+            album: album,
+            duration: duration,
+            isExplicit: isExplicit,
+            playsInfo: playsInfo,
+            radio: radio,
+            thumbnails: thumbnails);
+#else
         return new(
             name: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
-            id: jsonToken.SelectObject<string>("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.videoId"),
+            id: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].navigationEndpoint.watchEndpoint.videoId"),
             artists: artists,
             album: jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{albumIndex}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{albumIndex}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Albums),
             duration: jsonToken.SelectObject<string>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{durationIndex}].text").ToTimeSpan(),
@@ -33,6 +54,7 @@ internal static class SearchParser
             playsInfo: jsonToken.SelectObject<string>("flexColumns[2].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
             radio: jsonToken.SelectRadio(),
             thumbnails: jsonToken.SelectThumbnails());
+#endif
     }
 
     /// <summary>
@@ -47,14 +69,43 @@ internal static class SearchParser
         int runsCount = jsonToken.SelectObject<JToken[]>("flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs").Length;
         int runsIndex = runsCount == 7 || runsCount == 3 ? 2 : 0;
 
+#if DEBUG
+
+        try
+        {
+            var name = jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+            var id = jsonToken.FindTokens("watchEndpoint").First().SelectObject<string>("videoId");
+            var artist = jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Artists);
+            var duration = (jsonToken.SelectObjectOptional<string>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 4}].text") ?? "00:00").ToTimeSpanLong();
+            var viewsInfo = jsonToken.SelectObjectOptional<string?>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].text") ?? "0 views";
+            var radio = runsCount == 3 ? new(jsonToken.SelectObjectOptional<string>("menu.menuRenderer.items[4].menuNavigationItemRenderer.navigationEndpoint.browseEndpoint.browseId")!, null) : jsonToken.SelectRadio();
+            var thumbnails = jsonToken.SelectThumbnails();
+
+            return new(
+                name: name,
+                id: id,
+                artist: artist,
+                duration: duration,
+                viewsInfo: viewsInfo,
+                radio: radio,
+                thumbnails: thumbnails);
+        }
+        catch
+        {
+
+        }
+
+        return null;
+#else
         return new(
             name: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
-            id: jsonToken.SelectObject<string>("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.videoId"),
+            id: jsonToken.FindTokens("watchEndpoint").First().SelectObject<string>("videoId"),
             artist: jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Artists),
             duration: (jsonToken.SelectObjectOptional<string>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 4}].text") ?? "00:00").ToTimeSpanLong(),
             viewsInfo: jsonToken.SelectObjectOptional<string?>($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].text") ?? "0 views",
             radio: runsCount == 3 ? new(jsonToken.SelectObjectOptional<string>("menu.menuRenderer.items[4].menuNavigationItemRenderer.navigationEndpoint.browseEndpoint.browseId")!, null) : jsonToken.SelectRadio(),
             thumbnails: jsonToken.SelectThumbnails());
+#endif
     }
 
     /// <summary>
@@ -150,13 +201,42 @@ internal static class SearchParser
         JToken[]? runs = jsonToken.SelectObject<JToken[]>("flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs");
         int runsIndex = runs.Length == 5 ? 2 : 0;
 
+#if DEBUG
+        var name = jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text");
+
+        var idToken = jsonToken.SelectToken("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint");
+        if (idToken == null)
+            idToken = jsonToken.SelectToken("navigationEndpoint.browseEndpoint");
+
+
+        var id = idToken.SelectObject<string>("videoId");
+        var podcast = jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Podcasts);
+        var releasedAt = jsonToken.SelectDateTime($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].text");
+        var isLikesAllowed = jsonToken.SelectObject<bool>("menu.menuRenderer.topLevelButtons[0].likeButtonRenderer.likesAllowed");
+        var thumbnails = jsonToken.SelectThumbnails();
+
         return new(
-            name: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
-            id: jsonToken.SelectObject<string>("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.videoId"),
-            podcast: jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Podcasts),
-            releasedAt: jsonToken.SelectDateTime($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].text"),
-            isLikesAllowed: jsonToken.SelectObject<bool>("menu.menuRenderer.topLevelButtons[0].likeButtonRenderer.likesAllowed"),
-            thumbnails: jsonToken.SelectThumbnails());
+                    name: name,
+                    id: id,
+                    podcast: podcast,
+                    releasedAt: releasedAt,
+                    isLikesAllowed: isLikesAllowed,
+                    thumbnails: thumbnails);
+#else
+
+        var idToken = jsonToken.SelectToken("overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint");
+        if (idToken == null)
+            idToken = jsonToken.SelectToken("navigationEndpoint.browseEndpoint");
+
+        return new(
+                    name: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
+                    id: idToken.SelectObject<string>("videoId"),
+                    podcast: jsonToken.SelectYouTubeMusicItem($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].text", $"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex + 2}].navigationEndpoint.browseEndpoint.browseId", YouTubeMusicItemKind.Podcasts),
+                    releasedAt: jsonToken.SelectDateTime($"flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[{runsIndex}].text"),
+                    isLikesAllowed: jsonToken.SelectObject<bool>("menu.menuRenderer.topLevelButtons[0].likeButtonRenderer.likesAllowed"),
+                    thumbnails: jsonToken.SelectThumbnails());
+#endif
+
     }
 
     /// <summary>
@@ -168,9 +248,14 @@ internal static class SearchParser
     public static ProfileSearchResult GetProfile(
         JToken jsonToken)
     {
+
+        var idToken = jsonToken.SelectToken("musicResponsiveListItemRenderer.overlay.musicItemThumbnailOverlayRenderer.content.musicPlayButtonRenderer.playNavigationEndpoint.watchEndpoint.videoId");
+        if (idToken == null)
+            idToken = jsonToken.SelectToken("navigationEndpoint.browseEndpoint");
+
         return new(
             name: jsonToken.SelectObject<string>("flexColumns[0].musicResponsiveListItemFlexColumnRenderer.text.runs[0].text"),
-            id: jsonToken.SelectObject<string>("navigationEndpoint.browseEndpoint.browseId"),
+            id: idToken.SelectObject<string>("browseId"),
             handle: jsonToken.SelectObject<string>("flexColumns[1].musicResponsiveListItemFlexColumnRenderer.text.runs[2].text"),
             thumbnails: jsonToken.SelectThumbnails());
     }

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestPlatform.PlatformAbstractions.Interfaces;
 using Newtonsoft.Json;
 using System.IO;
+using System.Net;
 using YouTubeMusicAPI.Client;
 using YouTubeMusicAPI.Models.Streaming;
 
@@ -14,6 +15,7 @@ internal class Streaming
 {
     ILogger logger;
     YouTubeMusicClient client;
+    bool usingCookies = true;
 
     [SetUp]
     public void Setup()
@@ -24,7 +26,22 @@ internal class Streaming
         });
 
         logger = factory.CreateLogger<Search>();
-        client = new(logger, TestData.GeographicalLocation);
+
+        if (usingCookies)
+        {
+            IEnumerable<Cookie> parsedCookies = TestData.CookiesString
+                .Split(";")
+                .Select(cookieString =>
+                {
+                    string[] parts = cookieString.Split("\t");
+                    return new Cookie(parts[0], parts[1]) { Domain = ".youtube.com" };
+                });
+            client = new(logger, TestData.GeographicalLocation, parsedCookies);
+        }
+        else
+        {
+            client = new(logger, TestData.GeographicalLocation);
+        }
     }
 
 

@@ -27,7 +27,7 @@ public static class Payload
                     browserVersion = "130.0.0.0",
                     osName = "Windows",
                     osVersion = "10.0",
-                    userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36,gzip(gfe)",
+                    userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
                     timeZone = "UTC",
                     utcOffsetMinutes = 0,
                     hl = "en",
