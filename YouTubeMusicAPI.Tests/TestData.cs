@@ -10,17 +10,17 @@ internal abstract class TestData
     /// <summary>
     /// Test geographical location for requests
     /// </summary>
-    public const string GeographicalLocation = "DE";
+    public const string GeographicalLocation = "US";
 
     /// <summary>
     /// Test visitor data for requests
     /// </summary>
-    public const string? VisitorData = null;
+    public const string? VisitorData = "Cgtrb2Zqbjh1dEYwVSjuvbfEBjIKCgJERRIEEgAgVQ%3D%3D";
 
     /// <summary>
     /// Test po token for requests
     /// </summary>
-    public const string? PoToken = null;
+    public const string? PoToken = "MnoncdjRufrHvSdPNAu1RIvPu4rxtEle9paKB7-Kt3JgSThJ_OJ8kU0Bsx-bQuV28hDadh0unwuz_VErF0x-32cez6yfwZ2tjuAfybIVoKVJS-dXVpPC6HE3vjUwTTuLRStGxpDJN6-Xc7238VB-h2ykBg-zf2ZbyZkWPg";
 
     /// <summary>
     /// Test cookies for authentication
@@ -29,7 +29,7 @@ internal abstract class TestData
     {
         get
         {
-            string? cookies = null;
+            string? cookies = "__Secure-3PSID=g.a000zwgU-zG4vBbzHxyL3Kfdd2aH8Es2pe1t_DWMWtDZyG4P3oio7M08Egww7eF8qeumixyTiQACgYKAZwSARISFQHGX2MiHhjei211t3vObbupYHFDXRoVAUF8yKqSvpF7CfyVUJwgNzCzv4oq0076;__Secure-1PAPISID=MtQp2-n4M9vBZiRb/AclH1iQBRTDIXVery;__Secure-3PAPISID=MtQp2-n4M9vBZiRb/AclH1iQBRTDIXVery;SSID=AfAGXFAgGcfbHUZeS;HSID=ARstNkXfQaXxafCPV;SID=g.a000zwgU-zG4vBbzHxyL3Kfdd2aH8Es2pe1t_DWMWtDZyG4P3oioPZNbsColueU49tNlQZ9igQACgYKATESARISFQHGX2MiDx1EOhrJifrzGhPXgf6T5BoVAUF8yKqknYiXsfVnowVBowmReq2M0076;SAPISID=MtQp2-n4M9vBZiRb/AclH1iQBRTDIXVery;__Secure-3PSIDTS=sidts-CjUB5H03P9sT8EB2tRdw0yPzyB_-sR-hdaWURKAkvvYKWm9uI1OdwKrsebW2JB3vG8twFOsdXxAA;APISID=UwsOGllqz4ox2kr0/Ai04jH_YUfXoA8cde;__Secure-1PSID=g.a000zwgU-zG4vBbzHxyL3Kfdd2aH8Es2pe1t_DWMWtDZyG4P3oiok9duYfOarTb734nRqsAWMAACgYKARkSARISFQHGX2MitnTQ03Jx5WjQYeLKm_1Z2BoVAUF8yKrnKvc06amuN6tpdN-t-Ht80076;__Secure-1PSIDTS=sidts-CjUB5H03P9sT8EB2tRdw0yPzyB_-sR-hdaWURKAkvvYKWm9uI1OdwKrsebW2JB3vG8twFOsdXxAA";
 
             return cookies?
                 .Split(';')
